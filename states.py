@@ -208,17 +208,18 @@ def writeStates(ticker,year,month,day):
     statesFile.close()
     
 
-    
-for ticker in portfolio:
-    year,month,day='2017','12','21'
-    write_day_intervals(ticker,year,month,day)
-    writeStates(ticker,year,month,day)
-    day='22'
-    write_day_intervals(ticker,year,month,day)
-    writeStates(ticker,year,month,day)
+if __name__ == "__main__":    
+    for ticker in portfolio:
+        days=['18','19','20','21','22']
+        year,month='2017','12'
+        for day in days:
+            write_day_intervals(ticker,year,month,day)
+            writeStates(ticker,year,month,day)
 
 
-finishTime=datetime.now()
-runTime=finishTime-startTime
 
-print('Total Runtime:',runTime)    
+
+    finishTime=datetime.now()
+    runTime=finishTime-startTime
+
+    print('Total Runtime:',runTime)    

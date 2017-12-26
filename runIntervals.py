@@ -15,15 +15,15 @@ month=nowTime.month
 
 days=[18,19,20,21,22]
 count=0
-
-for ticker in portfolio:
-    print('Compiling intervals for',ticker)
-    for day in days:
-        count+=1
-        write_day_intervals(ticker,year,month,str(day))
+if __name__ == "__main__":
+    for ticker in portfolio:
+        print('Compiling intervals for',ticker)
+        for day in days:
+            count+=1
+            write_day_intervals(ticker,year,month,str(day))
 
         
-finishTime=datetime.now()
-runTime=finishTime-startTime
-print('Compiled intervals for',count,'tickers.')
-print('Total Runtime:',runTime)
+    finishTime=datetime.now()
+    runTime=finishTime-startTime
+    print('Compiled intervals for',count,'tickers.')
+    print('Total Runtime:',runTime)
