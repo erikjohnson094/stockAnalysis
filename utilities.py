@@ -17,6 +17,17 @@ def med_string(Float):
 def assemble_dir(ticker,year,month,day):
     return 'Stocks/'+ticker+'/'+str(year)+'/'+str(month)+'/'+str(day)
 
+def parse_list_from_str(string):
+    string=string.replace('[','')
+    string=string.replace(']','')
+    string=string.replace('\n','')
+    stringList=string.split(',')
+    newList=[]
+    for element in stringList:
+        if element != '':
+            newList.append(float(element))
+    return newList
+    
 def parse_dict_from_str(dictStr,dictObj):
     if dictStr[0]=='{' and dictStr[-1]=='}':
         args=dictStr.replace('{','')
@@ -64,7 +75,19 @@ def parse_snapshot_from_str(string):
     volume=int(splitString[1])
     time=int(splitString[2])
     return {'price':price,'volume':volume,'time':time}
-
+def parse_pattern_from_str(string):
+    newString=string.replace('{','')
+    newString=newString.replace('}','')
+    if len(newString)!=len(string)-2:
+        raise KeyError('Bad string supplied to parse pattern.')
+    splitString=newString.split('],')
+    pattern={}
+    for eachString in splitString:
+        eachString=eachString.split(':')
+        key=eachString[0]
+        value=parse_list_from_str(eachString[1])
+        pattern[key]=value
+    return pattern
 def write_list(fileObject,listToWrite):
     '''
     Parses a python list and appends it to the write file as a newline in csv format
@@ -238,3 +261,59 @@ def read_compiled_states(fileObject):
         states.append(state)
     return states
 
+def read_pattern_traits(ticker):
+    filepath='Stocks/'+ticker+'/patternTraits.txt'
+    fileObject=open(filepath,'r')
+    patterns=fileObject.readlines()
+    patterns.pop()
+    patternTraits=[]
+    for pattern in patterns:
+        pattern=parse_pattern_from_str(pattern)
+        patternTraits.append(pattern)
+    return patternTraits
+def write_compiled_pattern(pattern,fileObject):
+    patternKeys=list(pattern.keys())
+    for key in patternKeys:
+        keyValues=list(pattern[key].keys())
+        fileObject.write(str(key)+'$')
+        for value in keyValues:
+            fileObject.write(str(value)+'^')  
+            fileObject.write(str(pattern[key][value]['weightedVelocity'])+'|')
+            fileObject.write(str(pattern[key][value]['totalWeight'])+'|')
+            fileObject.write(str(pattern[key][value]['totalCount']))
+            fileObject.write('^^')
+        fileObject.write('$$')
+    fileObject.write('\n')   
+    return True
+
+def write_compiled_patterns(patterns,fileObject):
+    for pattern in patterns:
+        write_compiled_pattern(pattern,fileObject)
+    return True
+def read_compiled_patterns(fileObject):
+    patterns=[]
+    patternList=fileObject.readlines()
+    patternList.pop()
+    for pattern in patternList:
+        patternDict={}
+        pattern=pattern.replace('\n','')
+        patternKeys=pattern.split('$$')
+        patternKeys.pop()
+        for patternKey in patternKeys:
+            patternKey=patternKey.split('$')
+            key=patternKey[0]
+            values=patternKey[1]
+            patternDict[key]={}
+            keyValues=values.split('^^')
+            keyValues.pop()
+            for keyValue in keyValues:
+                keyValue=keyValue.split('^')
+                value=float(keyValue[0])
+                attributes=keyValue[1]
+                patternDict[key][value]={}
+                attributes=attributes.split('|')
+                patternDict[key][value]['weightedVelocity']=float(attributes[0])
+                patternDict[key][value]['totalWeight']=float(attributes[1])
+                patternDict[key][value]['totalCount']=float(attributes[2])
+        patterns.append(patternDict)
+    return patterns

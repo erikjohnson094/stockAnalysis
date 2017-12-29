@@ -15,7 +15,7 @@ year=nowTime.year
 month=nowTime.month
 #day=nowTime.day
 
-days=[18,19,20,21,22]
+days=[26]
 
 for ticker in portfolio:
     for day in days:

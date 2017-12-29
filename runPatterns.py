@@ -1,48 +1,72 @@
 from utilities import read_compiled_states
 from utilities import assemble_dir
-
-'''
-correlations=[
-    ['pm|60','pm|90','vl|60','wkd','hr'],
-    ['wkd','hr','pm|60'],
-    ['pm|60','pm|90','vl|60'],
-    ['pm|60','pr|60','vl|60'],
-    ['pm|5','pm|15','pm|45s','pm|60'],
-    ['pm|60','pr|60','vl|60'],
-    [],
-    [],
-    [],
-    [],
-    [],
-    
-]'''
-
-weightBrackets=[]
-for i in range(10):
-    weightBrackets.append((i+1)*.1)
-
-base={'price':0 ,'time':0 ,'volume':0 ,'priceDifference':0 ,'volumeDifference':0 , 'timeInterval':0 ,'wkd':0 ,'hr':0 ,'pm|1':0 , 'pm|2':0 , 'pm|5':0 , 'pm|10':0 , 'pm|15':0 , 'pm|30':0 , 'pm|45':0 , 'pm|60':0 , 'pm|90':0 , 'pm|120':0 , 'pm|180':0 , 'pm|240':0 , 'pm|300':0 , 'vl|5':0 , 'vl|10':0 , 'vl|30':0 , 'vl|60':0 , 'vl|120':0 , 'vl|240':0 , 'pr|1':0 , 'pr|2':0 , 'pr|5':0 , 'pr|10':0 , 'pr|15':0 , 'pr|30':0 , 'pr|45':0 , 'pr|60':0 , 'pr|90':0 , 'pr|120':0 , 'pr|180':0 , 'pr|240':0 , 'pr|300':0 }
-
-
-portfolio=['AAPL']
+from utilities import read_pattern_traits
+from utilities import write_compiled_patterns
+from datetime import datetime
+startTime=datetime.now()
+portfolio=['AAPL','ADI','ALB','AMD','AMZN','ANF','ATVI','BABA','BHGE','EA','EGHT','FMC','GE','GGP','GILD','GM','GME',
+           'GOOG','HAL','HD','HON','INTC','JCP','LIT','M','MDT','MSFT','NFLX','NVDA','QCOM','RIOT','RNG','SHLD','SHOP',
+           'SLB','SNE','SQ','SQM','STMP','SYF','TAL','TGT','TJX','TSLA','TWX','TXN','UA','UTX','VNQ','XNET','AEP','BDX','CB','EIX',
+           'GLW','INTU','MMM','NSC','PX','SHW','SNX','TXN','XEL','IYW']
+days=['18','19','20','21','22']
 if __name__ == "__main__":
     for ticker in portfolio:
-        days=['22']
         for day in days:
             year,month='2017','12'
             filepath=assemble_dir(ticker,year,month,day)+'/compiledStates.txt'
             fileObject=open(filepath,'r')
             states=read_compiled_states(fileObject)
-            #patterns=read_patterns(ticker)
-            patterns=[{'keys':['pm|45']}]
-            for state in states:
-                for pattern in patterns:
+            fileObject.close()
+            patterns=read_pattern_traits(ticker)
+            compiledPatterns=[]
+            patternsAnalyzed=0
+            for pattern in patterns:
+                compiledPattern={}
+                for key in pattern.keys():
+                    compiledPattern[key]={}
+                    for eachValue in pattern[key]:
+                        compiledPattern[key][eachValue]={'weightedVelocity':0.0,'totalWeight':0.0,'totalCount':0}
+                compiledPatterns.append(compiledPattern)
+                for state in states:
+                    stateVelocity=state['velocity']
                     for key in pattern.keys():
-                        totalWeights=0
-
-                        stateBins=list(state[key].keys())
-                        for eachBin in stateBins:
-                            totalWeights+=state[key][eachBin]
-                        if totalWeights>0.1:
-                        
-
+                        if key=='wkd' or key=='hr':
+                            stateValue=float(state[key])
+                            binWeight=1
+                            compiledPattern[key][stateValue]['totalWeight']+=binWeight
+                            compiledPattern[key][stateValue]['weightedVelocity']+=binWeight*stateVelocity
+                            compiledPattern[key][stateValue]['totalCount']+=1
+                        else:
+                            patternBins=list(compiledPattern[key].keys())
+                            stateBins=list(state[key].keys())
+                            totalWeights=0
+                            for eachBin in stateBins:
+                                binWeight=state[key][eachBin]
+                                totalWeights+=binWeight
+                            if 1.1>totalWeights>0.9:
+                                for i in range(len(stateBins)):
+                                    eachBin=stateBins[i]
+                                    binWeight=state[key][eachBin]
+                                    thisBin=False
+                                    for j in range(len(patternBins)):
+                                        if j==len(patternBins)-1:
+                                            if eachBin>=patternBins[j]:
+                                                thisBin=patternBins[j]
+                                        else:
+                                            if patternBins[j]<=eachBin<patternBins[j+1]:
+                                                thisBin=patternBins[j]
+                                    if thisBin:
+                                        if binWeight>0:
+                                            compiledPattern[key][thisBin]['totalWeight']+=binWeight
+                                            compiledPattern[key][thisBin]['weightedVelocity']+=binWeight*stateVelocity
+                                            compiledPattern[key][thisBin]['totalCount']+=1
+                patternsAnalyzed+=1
+                currentTime=datetime.now()
+                runTime=currentTime-startTime
+                if patternsAnalyzed%100==0:
+                    print('Analyzing',ticker,'on',year,month,day,'patterns analyzed:',patternsAnalyzed)
+                    print('Runtime:',runTime)
+            filepath=assemble_dir(ticker,year,month,day)+'/compiledPatterns.txt'
+            fileObject=open(filepath,'w')
+            write_compiled_patterns(compiledPatterns,fileObject)
+            fileObject.close()
