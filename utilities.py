@@ -257,7 +257,7 @@ def read_compiled_states(fileObject):
                     value=float(thisBin[0])
                     total=float(thisBin[1])
                     state[name][value]=total
-        state['velocity']=float(state['priceDifference']/state['timeInterval'])
+        state['velocity']=60000*float(state['priceDifference']/(state['price']*state['timeInterval'])) # units of %/min
         states.append(state)
     return states
 
@@ -265,7 +265,6 @@ def read_pattern_traits(ticker):
     filepath='Stocks/'+ticker+'/patternTraits.txt'
     fileObject=open(filepath,'r')
     patterns=fileObject.readlines()
-    patterns.pop()
     patternTraits=[]
     for pattern in patterns:
         pattern=parse_pattern_from_str(pattern)
@@ -293,7 +292,6 @@ def write_compiled_patterns(patterns,fileObject):
 def read_compiled_patterns(fileObject):
     patterns=[]
     patternList=fileObject.readlines()
-    patternList.pop()
     for pattern in patternList:
         patternDict={}
         pattern=pattern.replace('\n','')

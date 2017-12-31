@@ -4,10 +4,8 @@ from utilities import read_pattern_traits
 from utilities import write_compiled_patterns
 from datetime import datetime
 startTime=datetime.now()
-portfolio=['AAPL','ADI','ALB','AMD','AMZN','ANF','ATVI','BABA','BHGE','EA','EGHT','FMC','GE','GGP','GILD','GM','GME',
-           'GOOG','HAL','HD','HON','INTC','JCP','LIT','M','MDT','MSFT','NFLX','NVDA','QCOM','RIOT','RNG','SHLD','SHOP',
-           'SLB','SNE','SQ','SQM','STMP','SYF','TAL','TGT','TJX','TSLA','TWX','TXN','UA','UTX','VNQ','XNET','AEP','BDX','CB','EIX',
-           'GLW','INTU','MMM','NSC','PX','SHW','SNX','TXN','XEL','IYW']
+portfolio=['AAPL','AMD','AMZN','BABA','GE','GM','LIT','RIOT','SHLD','TAL','TSLA','TXN','IYW']
+
 days=['18','19','20','21','22']
 if __name__ == "__main__":
     for ticker in portfolio:
