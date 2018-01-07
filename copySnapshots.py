@@ -15,11 +15,16 @@ year=nowTime.year
 month=nowTime.month
 #day=nowTime.day
 
-days=[26]
+dayMonthYears=[(27,12,2017),
+               (28,12,2017),
+               (29,12,2017),
+               (2,1,2018),
+               (3,1,2018),
+               (5,1,2018)]
 
-for ticker in portfolio:
-    for day in days:
-        day=str(day)
+for dayMonthYear in dayMonthYears:
+    for ticker in portfolio:
+        day,month,year=dayMonthYear
         directory=assemble_dir(ticker,year,month,day)
         destination=directory+'/snapshotData.csv'
         if not os.path.exists(directory):

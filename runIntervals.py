@@ -9,18 +9,20 @@ portfolio=['AAPL','ADI','ALB','AMD','AMZN','ANF','ATVI','BABA','BHGE','EA','EGHT
            'GLW','INTU','MMM','NSC','PX','SHW','SNX','TXN','XEL','IYW']
 
 nowTime=datetime.now()
-year=nowTime.year
-month=nowTime.month
-#day=nowTime.day
-
-days=[18,19,20,21,22]
+dayMonthYears=[(27,12,2017),
+               (28,12,2017),
+               (29,12,2017),
+               (2,1,2018),
+               (3,1,2018),
+               (5,1,2018)]
 count=0
 if __name__ == "__main__":
     for ticker in portfolio:
         print('Compiling intervals for',ticker)
-        for day in days:
+        for dayMonthYear in dayMonthYears:
+            day,month,year=dayMonthYear
             count+=1
-            write_day_intervals(ticker,year,month,str(day))
+            write_day_intervals(ticker,year,month,day)
 
         
     finishTime=datetime.now()

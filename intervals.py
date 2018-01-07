@@ -19,6 +19,21 @@ def compile_intervals(ticker,year,month,day):
         latestSnapshot=snapshot
     return intervals
         
+def compile_intervals_from_snapshots(snapshots):
+    latestSnapshot=None
+    intervals=[]
+    for snapshot in snapshots:
+        if not latestSnapshot==None:
+            timeInterval=int(snapshot['time'])-int(latestSnapshot['time'])
+            if timeInterval>0:
+                priceDifference=float(snapshot['price'])-float(latestSnapshot['price'])
+                volumeDifference=float(snapshot['volume'])-float(latestSnapshot['volume'])
+                if not( (priceDifference!=0.0) and (volumeDifference==0.0)):
+                    interval={'price':snapshot['price'], 'time':snapshot['time'], 'volume':snapshot['volume'], 'priceDifference':priceDifference, 'volumeDifference':volumeDifference, 'timeInterval':timeInterval}
+                    intervals.append(interval)
+        latestSnapshot=snapshot
+    return intervals
+    
 def write_day_intervals(ticker,year,month,day):
     filepath=assemble_dir(ticker,year,month,day)+'/intervalData.csv'
     fileObject=open(filepath,'w')

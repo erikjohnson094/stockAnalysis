@@ -6,7 +6,8 @@ from utilities import remove_outliers
 from utilities import write_compiled_states
 from intervals import write_day_intervals
 from utilities import read_compiled_states
-portfolio=['AAPL','ADI','ALB','AMD','AMZN','ANF','ATVI','BABA','BHGE','EA','EGHT','FMC','GE','GGP','GILD','GM','GME',
+done=['AAPL','ADI','ALB','AMD','AMZN','ANF','ATVI','BABA','BHGE','EA',]
+portfolio=['EGHT','FMC','GE','GGP','GILD','GM','GME',
            'GOOG','HAL','HD','HON','INTC','JCP','LIT','M','MDT','MSFT','NFLX','NVDA','QCOM','RIOT','RNG','SHLD','SHOP',
            'SLB','SNE','SQ','SQM','STMP','SYF','TAL','TGT','TJX','TSLA','TWX','TXN','UA','UTX','VNQ','XNET','AEP','BDX','CB','EIX',
            'GLW','INTU','MMM','NSC','PX','SHW','SNX','TXN','XEL','IYW']
@@ -102,6 +103,19 @@ def compileVolBins(numBins,ticker,year,month,day):
         volBins.append(nextBin)
     return volBins
 
+def compileVolBinsFromIntervals(numBins,intervals):
+    volChanges=[]
+    for i in range(len(intervals)):
+        interval=intervals[i]
+        volChanges.append(interval['volumeDifference'])
+    volChanges=remove_outliers(volChanges)
+    volRange=max(volChanges)-min(volChanges)
+    volBins=[]
+    for i in range(numBins):
+        nextBin=((i+1)*float(1/numBins))**2*volRange
+        volBins.append(nextBin)
+    return volBins
+
 def compilePmBins():
     pmBins=[-100,-60,-40,-25,-10,-8,-6,-4,-3,-2.5,-2,-1.6,-1.3,-1,-.8,-.6,-.5, -.4, -.3, -.2,-.1,-.05,0,.05,.1,.2,.3,.4, .5, .6, .8,1, 1.3,1.6, 2,2.5,3,4,6,8, 10,20,40,70,100]
     reducedBins=[]
@@ -137,6 +151,91 @@ def readDayStates(ticker,year,month,day):
             timeStates.append(state)
         states.append(timeStates)
     return states
+
+def read_states_from_intervals(intervals):
+    svNames,svIntervals=state_variables()
+    states=[]
+    for i in range(len(intervals)):
+        timeStates=[]
+        #print('I',intervals[i])
+        dt=datetime.fromtimestamp(intervals[i]['time']/1000)
+        wkd=dt.weekday()
+        hr=dt.hour
+        for j in range(i):
+            #print('J',intervals[j])
+            state={}
+            for key in intervals[i].keys():
+                state[key]=intervals[i][key]
+            timeDiff=intervals[i]['time']-intervals[j]['time']
+            #print(timeDiff)
+            newStates=findStates(timeDiff,intervals[i],intervals[j])
+            newStates['wkd']=wkd
+            newStates['hr']=hr
+            for key in newStates.keys(): 
+                state[key]=newStates[key]
+            for key in svIntervals.keys():
+                if key not in state.keys():
+                    state[key]=None
+            timeStates.append(state)
+        states.append(timeStates)
+    return states
+
+def compile_states_from_intervals(intervals):
+    states=read_states_from_intervals(intervals)
+    compiledStates=[]
+    for i in range(len(states)):
+        dt=datetime.fromtimestamp(intervals[i]['time']/1000)
+        wkd=dt.weekday()
+        hr=dt.hour
+        pmBins=compilePmBins()
+        volBins=compileVolBinsFromIntervals(len(pmBins),intervals)
+        prBins=[-1,0,1]
+        compiledState={}
+        for key in intervals[i].keys():
+            compiledState[key]=intervals[i][key]                        
+        compiledState['wkd']=wkd
+        compiledState['hr']=hr
+        keys=['pm|1', 'pm|2', 'pm|5', 'pm|10', 'pm|15', 'pm|30', 'pm|45', 'pm|60', 'pm|90', 'pm|120', 'pm|180', 'pm|240', 'pm|300', 'vl|5', 'vl|10', 'vl|30', 'vl|60', 'vl|120', 'vl|240', 'pr|1', 'pr|2', 'pr|5', 'pr|10', 'pr|15', 'pr|30', 'pr|45', 'pr|60', 'pr|90', 'pr|120', 'pr|180', 'pr|240', 'pr|300']
+        for key in keys:
+            split=key.split('|')
+            segment=split[0]
+            compiledState[key]={}
+            if segment=='pm':
+                for eachBin in pmBins:
+                    compiledState[key][eachBin]=0
+            elif segment=='vl':
+                for eachBin in volBins:
+                    compiledState[key][eachBin]=0
+            elif segment=='pr':
+                for eachBin in prBins:
+                    compiledState[key][eachBin]=0
+        for state in states[i]:
+            for key in keys:
+                if state[key]!=None:
+                    split=key.split('|')
+                    segment=split[0]
+                    if segment=='pm':  
+                        for k in range(len(pmBins)):
+                            if k==len(pmBins)-1:
+                                if pmBins[k]<state[key]:
+                                    compiledState[key][pmBins[k]]+=1
+                            else:
+                                if pmBins[k]<state[key]<=pmBins[k+1]:
+                                    compiledState[key][pmBins[k]]+=1
+                    elif segment=='vl':  
+                        for k in range(len(volBins)):
+                            if k==0:
+                                if volBins[k]>state[key]:
+                                    compiledState[key][volBins[k]]+=1
+                            else:
+                                if volBins[k-1]<state[key]<=volBins[k]:
+                                    compiledState[key][volBins[k]]+=1
+                    elif segment=='pr':
+                        for k in range(len(prBins)):
+                            if prBins[k]==state[key]:
+                                compiledState[key][prBins[k]]+=1
+        compiledStates.append(compiledState)
+    return compiledStates
 
 def compileStates(ticker,year,month,day):
     print('Compiling',ticker)
@@ -207,12 +306,13 @@ def writeStates(ticker,year,month,day):
     write_compiled_states(states,ticker,year,month,day)
     statesFile.close()
     
-
+dayMonthYears=[(28,12,2017),
+               (2,1,2018),
+               (3,1,2018)]
 if __name__ == "__main__":    
     for ticker in portfolio:
-        days=['18','19','20','21','22']
-        year,month='2017','12'
-        for day in days:
+        for dayMonthYear in dayMonthYears:
+            day,month,year=dayMonthYear
             write_day_intervals(ticker,year,month,day)
             writeStates(ticker,year,month,day)
 

@@ -4,13 +4,17 @@ from utilities import read_pattern_traits
 from utilities import write_compiled_patterns
 from datetime import datetime
 startTime=datetime.now()
-portfolio=['AAPL','AMD','AMZN','BABA','GE','GM','LIT','RIOT','SHLD','TAL','TSLA','TXN','IYW']
+done=['AAPL','AMD','AMZN','BABA',]
+portfolio=['GE','GM','LIT','RIOT','SHLD','TAL','TSLA','TXN']
 
-days=['18','19','20','21','22']
+dayMonthYears=[(28,12,2017),
+               (2,1,2018),
+               (3,1,2018)]
+
 if __name__ == "__main__":
     for ticker in portfolio:
-        for day in days:
-            year,month='2017','12'
+        for dayMonthYear in dayMonthYears:
+            day,month,year=dayMonthYear
             filepath=assemble_dir(ticker,year,month,day)+'/compiledStates.txt'
             fileObject=open(filepath,'r')
             states=read_compiled_states(fileObject)

@@ -1,13 +1,16 @@
+from datetime import datetime
+startTime=datetime.now()
 from compilePatterns import compile_patterns
 from utilities import assemble_dir
 from utilities import read_compiled_states
-from utilities import write_compiled_patterns
+from utilities import write_compiled_patterns_dict
 import numpy as np
-from datetime import datetime
-startTime=datetime.now()
-def sum_compiled_states(ticker,year,month,days):
+
+print('STARTED',startTime)
+def sum_compiled_states(ticker,dayMonthYears):
     compiledStates=[]
-    for day in days:
+    for dayMonthYear in dayMonthYears:
+        day,month,year=dayMonthYear
         filepath=assemble_dir(ticker,year,month,day)+'/compiledStates.txt'
         fileObject=open(filepath,'r')
         states=read_compiled_states(fileObject)
@@ -32,20 +35,6 @@ def read_active_keys(state):
             usedKeys.append(key)
     return usedKeys
 
-def get_seed_velocities(ticker,year,month,days):
-    patterns=compile_patterns(ticker,year,month,days)
-    velocities=[]
-    for key in patterns.keys():
-        pattern=patterns[key]
-        for smallKey in pattern.keys():
-            singlePattern=pattern[smallKey]
-            for eachValue in singlePattern.keys():
-                totalWeight=singlePattern[eachValue]['totalWeight']
-                if totalWeight>0:
-                    weightedVelocity=singlePattern[eachValue]['weightedVelocity']
-                    totalCount=singlePattern[eachValue]['totalCount']
-                    velocities.append(weightedVelocity/totalWeight)
-    return velocities
 
 def read_primary_keys(state,ignores):
     keyList=[]
@@ -85,12 +74,15 @@ def find_volume_bin(keyParameters,volume):
                 return volBins[i]
 
 def find_velocity_modifiers(stateKey,stateValue,valueWeight,thisPattern):
+    stateValue=round(stateValue,4)
     splitKey=stateKey.split('|')
     keyParameters=thisPattern[stateKey]
     if splitKey[0]=='vl':
         patternBin=find_volume_bin(keyParameters,stateValue)
     else:
         patternBin=stateValue
+    if patternBin==None:
+        return 0.0,0.0
     patternTraits=thisPattern[stateKey][patternBin]
     weightedVelocity=patternTraits['weightedVelocity']
     weight=patternTraits['totalWeight']
@@ -156,75 +148,110 @@ def estimate_velocity(state,patterns):
                             weightModifiers.append(modifiedWeight)
                             usedPatterns.append({'primaryKey':primaryKey,'eachKey':eachKey,'value':value})
     weightedVelocity=find_weighted_average(normalizedVelocities,weightModifiers)
+    if np.isnan(weightedVelocity):
+        weightedVelocity=0
     return weightedVelocity,usedPatterns
 
-def optimize_patterns(trueVelocity,patterns,usedPatterns,speedFactor):
-    offsets=[]
+def add_true_velocity(trueVelocity,usedPatterns,patterns):
     for i in range(len(usedPatterns)):
         patternFactors=usedPatterns[i]
         primaryKey=patternFactors['primaryKey']
         eachKey=patternFactors['eachKey']
         value=patternFactors['value']
         thesePatternTraits=patterns[primaryKey][eachKey][value]
-        totalWeight=thesePatternTraits['totalWeight']
-        weightedVelocity=thesePatternTraits['weightedVelocity']
-        totalCount=thesePatternTraits['totalCount']
-        if totalWeight>0:
-            normalizedVelocity=weightedVelocity/totalWeight
-            velocityDifference=normalizedVelocity-trueVelocity
-            if float(normalizedVelocity)==0.0:
-                percentOffset=1
-            else:
-                percentOffset=velocityDifference/abs(normalizedVelocity)
-            offsets.append(percentOffset)
-            offsetRatio=min((speedFactor*100/totalCount),1.0)
-            newWeightedVelocity=weightedVelocity-(offsetRatio*percentOffset)
-            patterns[primaryKey][eachKey][value]['weightedVelocity']=newWeightedVelocity
-            patterns[primaryKey][eachKey][value]['totalCount']=totalCount+(100*speedFactor)
-            
-    return patterns,offsets
+        if trueVelocity!=0.0:
+            thesePatternTraits['velocities'].append(trueVelocity)
+    return patterns
 
 def store_updated_patterns(ticker,patterns):
-    filepath='Stocks/'+ticker+'/learnedPatterns.txt'
+    filepath='Stocks/'+ticker+'/learnedPatterns2.txt'
     fileObject=open(filepath,'w')
-    write_compiled_patterns(patterns,fileObject)
+    write_compiled_patterns_dict(patterns,fileObject)
     fileObject.close()
 
+def init_patterns(patterns):
+    for primaryKey in patterns.keys():
+        for stateKey in patterns[primaryKey].keys():
+            for value in patterns[primaryKey][stateKey].keys():
+                patterns[primaryKey][stateKey][value]['velocities']=[]
+    return patterns
+
+
+def add_true_velocities(compiledStates,patterns):
+    for i in range(len(compiledStates)):
+        state=compiledStates[i]
+        calculatedVelocity,usedPatterns=estimate_velocity(state,patterns)
+        if i!=0:
+            trueVelocity=state['velocity']
+            patterns=add_true_velocity(trueVelocity,usedPatterns,patterns)
+    return patterns
+
+
+
+def update_velocities(patterns,speedFactor):
+    offsets=[]
+    for primaryKey in patterns.keys():
+        for stateKey in patterns[primaryKey].keys():
+            for value in patterns[primaryKey][stateKey].keys():
+                theseTraits=patterns[primaryKey][stateKey][value]
+                medianVelocity=np.median(theseTraits['velocities'])
+                weightedVelocity=theseTraits['weightedVelocity']
+                weight=theseTraits['totalWeight']
+                count=theseTraits['totalCount']
+                if weight!=0.0 and weightedVelocity!=0.0:
+                    normalizedVelocity=weightedVelocity/weight
+                    velocityDifference=normalizedVelocity-medianVelocity
+                    percentDifference=velocityDifference/normalizedVelocity
+                    offsets.append(100*percentDifference)
+                    if percentDifference<5:
+                        patterns[primaryKey][stateKey][value]['weightedVelocity']=weight*normalizedVelocity*(1-percentDifference*speedFactor)
+                    else:
+                        patterns[primaryKey][stateKey][value]['weightedVelocity']=weight*medianVelocity
+                else:
+                    patterns[primaryKey][stateKey][value]['weightedVelocity']=weight*medianVelocity
+                for numericKey in patterns[primaryKey][stateKey][value].keys():
+                    if numericKey!='velocities':
+                        if np.isnan(patterns[primaryKey][stateKey][value][numericKey]):
+                            patterns[primaryKey][stateKey][value][numericKey]=0.0
+                patterns[primaryKey][stateKey][value]['velocities']=[]
+    return patterns,offsets
+
+
+dayMonthYears=[(18,12,2017),
+               (19,12,2017),
+               (20,12,2017),
+               (21,12,2017),
+               (22,12,2017),
+               (28,12,2017),
+               (2,1,2018),
+               (3,1,2018)]
 
 if __name__=='__main__':
     iterations=0
-    allOffsets=[]
+    numTotalIterations=8
     statesIterated=0
-    while True:
-        portfolio=['AAPL']
-        days=['18','19','20','21','22']
-        for ticker in portfolio:
-            year,month='2017','12'
+    done=['AMD','AMZN','BABA',]
+    portfolio=['GE','GM','LIT','RIOT','SHLD','TAL','TSLA','TXN']
+    for ticker in portfolio:
+        for i in range(numTotalIterations):
             if iterations==0:
-                patterns=compile_patterns(ticker,year,month,days)
-            else:
-                patterns=new_patterns
-            compiledStates=sum_compiled_states(ticker,year,month,days)
-            for i in range(len(compiledStates)):
-                statesIterated+=1
-                state=compiledStates[i]
-                calculatedVelocity,usedPatterns=estimate_velocity(state,patterns)
-                if i!=0:
-                    trueVelocity=state['velocity']
-                    new_patterns,offsets=optimize_patterns(trueVelocity,patterns,usedPatterns,.5)
-                    for offset in offsets:
-                        allOffsets.append(abs(100*offset))
+                patterns=compile_patterns(ticker,dayMonthYears)
+            init_patterns(patterns)
+            compiledStates=sum_compiled_states(ticker,dayMonthYears)
+            patterns=add_true_velocities(compiledStates,patterns)
+            patterns,allOffsets=update_velocities(patterns,.05)
+            statesIterated+=len(compiledStates)
             iterations+=1
-        runTime=datetime.now()-startTime
-        
-        print('Iterations:',iterations)
-        print('States iterated:',statesIterated)
-        print('Runtime:',runTime)
-        print('Mean:',np.mean(allOffsets))
-        print('Median:',np.median(allOffsets))
-        print('Min:',min(allOffsets))
-        print('Max:',max(allOffsets))
-        print(new_patterns)
-        store_updated_patterns(ticker,new_patterns)
-        #newPatterns=optimize_patterns(patterns,compiledStates)
+            runTime=datetime.now()-startTime
+            print('Ticker:',ticker)
+            print('Iterations:',iterations)
+            print('States iterated:',statesIterated)
+            print('Runtime:',runTime)
+            print('Mean:',np.mean(allOffsets))
+            print('Median:',np.median(allOffsets))
+            print('Min:',min(allOffsets))
+            print('Max:',max(allOffsets))
+            print('Stdev:',np.std(allOffsets))
+            store_updated_patterns(ticker,patterns)
+            #newPatterns=optimize_patterns(patterns,compiledStates)
         

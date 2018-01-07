@@ -4,6 +4,35 @@ import time
 import os
 import numpy as np
 from datetime import datetime 
+
+def timeToUTCMills(timeToConvert):
+    seconds=int(timeToConvert.strftime('%s'))
+    mills=seconds*1000
+    return int(mills)
+def yesterday(day,month,year):
+    months={'Jan':[1,31],'Feb':[2,28],'Mar':[3,31],'Apr':[4,30],'May':[5,31],'Jun':[6,30],'Jul':[7,31],'Aug':[8,31],'Sep':[9,30],'Oct':[10,31],'Nov':[11,30],'Dec':[12,31]}
+    today=datetime(day=day,month=month,year=year)
+    if today.day!=1:
+        yesterdayDay=today.day-1
+        yesterdayMonth=today.month
+        yesterdayYear=today.year
+    else:
+        if today.month==1:
+            yesterdayMonth=12
+            yesterdayYear=today.year-1
+        else:
+            yesterdayYear=today.year
+            yesterdayMonth=today.month-1
+        for key in months.keys():
+            if months[key][0]==yesterdayMonth:
+                yesterdayDay=months[key][1]
+    return yesterdayDay,yesterdayMonth,yesterdayYear
+
+def daysBack(day,month,year,numDays):
+    for i in range(numDays):
+        day,month,year=yesterday(day,month,year)
+    return day,month,year
+    
 def small_string(Float):
     if len(str(Float))>4:
         return ('%.4g' % Float)
@@ -179,7 +208,9 @@ def get_date(utcMills):
     year=date.year
     month=date.month
     day=date.day
-    return year,month,day
+    hour=date.hour
+    minute=date.minute
+    return year,month,day,hour,minute
 
 def write_latest_snapshot(ticker):
     snapshot,quote=get_snapshot(ticker)
@@ -276,6 +307,8 @@ def write_compiled_pattern(pattern,fileObject):
         keyValues=list(pattern[key].keys())
         fileObject.write(str(key)+'$')
         for value in keyValues:
+            if np.isnan(pattern[key][value]['weightedVelocity']):
+                pattern[key][value]['weightedVelocity']=0.0
             fileObject.write(str(value)+'^')  
             fileObject.write(str(pattern[key][value]['weightedVelocity'])+'|')
             fileObject.write(str(pattern[key][value]['totalWeight'])+'|')
@@ -289,6 +322,11 @@ def write_compiled_patterns(patterns,fileObject):
     for pattern in patterns:
         write_compiled_pattern(pattern,fileObject)
     return True
+def write_compiled_patterns_dict(patterns,fileObject):
+    for key in patterns.keys():
+        write_compiled_pattern(patterns[key],fileObject)
+    return True
+
 def read_compiled_patterns(fileObject):
     patterns=[]
     patternList=fileObject.readlines()
